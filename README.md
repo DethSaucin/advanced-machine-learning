@@ -1,3 +1,3 @@
 # advanced-machine-learning
 
-school stuff
+school stuff - collection of machine learning hw
