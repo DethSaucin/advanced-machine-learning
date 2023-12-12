@@ -1,0 +1,58 @@
+<script>
+async extractMFCCs(file) {
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const audioData = await file.arrayBuffer();
+  const audioBuffer = await audioContext.decodeAudioData(audioData);
+
+  const bufferSize = 2048;
+  let mfccs = [];
+  let promises = [];
+
+  // > process the audio in chunks of 2048 samples
+  for (let i = 0; i < audioBuffer.length; i += bufferSize) {
+    let promise = new Promise(resolve => {
+      let bufferSource = audioContext.createBufferSource();
+      bufferSource.buffer = audioBuffer;
+
+      // > create a Meyda Analyzer instance
+      let meydaAnalyzer = Meyda.createMeydaAnalyzer({
+        audioContext: audioContext,
+        source: bufferSource,
+        bufferSize: bufferSize,
+        featureExtractors: ['mfcc'],
+        callback: (features) => {
+          mfccs.push(features.mfcc);
+          resolve();
+        }
+      });
+
+      // > start the source and analyzer
+      bufferSource.start(audioContext.currentTime, i / audioContext.sampleRate, bufferSize / audioContext.sampleRate);
+      meydaAnalyzer.start();
+    });
+
+    promises.push(promise);
+  }
+
+  await Promise.all(promises); // > wait for all buffers to be processed
+
+  audioContext.close(); // > close the AudioContext to release resources
+
+  return this.averageFeatures(mfccs);
+},
+averageFeatures(featureArray) {
+  if (featureArray.length === 0) return [];
+
+  // > calculate the sum of each MFCC component across all feature vectors
+  let summedFeatures = featureArray[0].map(() => 0);
+  featureArray.forEach(features => {
+    features.forEach((feature, index) => {
+      summedFeatures[index] += feature;
+    });
+  });
+
+  // > divide by the number of feature vectors to get the average
+  let averagedFeatures = summedFeatures.map(sum => sum / featureArray.length);
+  return averagedFeatures;
+},
+</script>
